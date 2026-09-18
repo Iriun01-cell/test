@@ -75,8 +75,8 @@ public class ReservationsFunctions
             PartitionKey = dto.Location,
             RowKey = Guid.NewGuid().ToString(),
             ReserverName = dto.ReserverName,
-            StartDateTime = dto.StartDateTime,
-            EndDateTime = dto.EndDateTime,
+            StartDateTime = DateTime.SpecifyKind(dto.StartDateTime, DateTimeKind.Utc),
+            EndDateTime = DateTime.SpecifyKind(dto.EndDateTime, DateTimeKind.Utc),
             Location = dto.Location,
             NumberOfPeople = dto.NumberOfPeople,
             Purpose = dto.Purpose
@@ -134,8 +134,8 @@ public class ReservationsFunctions
                 PartitionKey = targetLocation,
                 RowKey = id,
                 ReserverName = dto.ReserverName,
-                StartDateTime = dto.StartDateTime,
-                EndDateTime = dto.EndDateTime,
+                StartDateTime = DateTime.SpecifyKind(dto.StartDateTime, DateTimeKind.Utc),
+                EndDateTime = DateTime.SpecifyKind(dto.EndDateTime, DateTimeKind.Utc),
                 Location = targetLocation,
                 NumberOfPeople = dto.NumberOfPeople,
                 Purpose = dto.Purpose
