@@ -1,0 +1,211 @@
+@page "/reservations"
+@using RMS.Web.Models
+@inject HttpClient Http
+
+<PageTitle>施設予約</PageTitle>
+
+<h1>施設予約</h1>
+
+<div class="mb-4" style="max-width:480px;">
+    <label class="form-label">施設で絞り込み</label>
+    <select class="form-select" @bind="FilterLocation" @bind:after="LoadReservationsAsync">
+        <option value="">すべての施設</option>
+        @foreach (var loc in Facilities)
+        {
+            <option value="@loc">@loc</option>
+        }
+    </select>
+</div>
+
+@if (ErrorMessage is not null)
+{
+    <div class="alert alert-danger">@ErrorMessage</div>
+}
+
+<h2>新規予約</h2>
+<EditForm Model="NewReservation" OnValidSubmit="CreateReservationAsync">
+    <DataAnnotationsValidator />
+    <div class="row g-3" style="max-width:720px;">
+        <div class="col-md-6">
+            <label class="form-label">施設</label>
+            <select class="form-select" @bind="NewReservation.Location">
+                @foreach (var loc in Facilities)
+                {
+                    <option value="@loc">@loc</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">予約者名</label>
+            <InputText class="form-control" @bind-Value="NewReservation.ReserverName" />
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">開始日時</label>
+            <InputDate Type="InputDateType.DateTimeLocal" class="form-control" @bind-Value="NewReservation.StartDateTime" />
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">終了日時</label>
+            <InputDate Type="InputDateType.DateTimeLocal" class="form-control" @bind-Value="NewReservation.EndDateTime" />
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">人数</label>
+            <InputNumber class="form-control" @bind-Value="NewReservation.NumberOfPeople" />
+        </div>
+        <div class="col-md-9">
+            <label class="form-label">目的</label>
+            <InputText class="form-control" @bind-Value="NewReservation.Purpose" />
+        </div>
+        <div class="col-12">
+            <button type="submit" class="btn btn-primary" disabled="@IsSubmitting">予約する</button>
+        </div>
+    </div>
+</EditForm>
+
+<h2 class="mt-5">予約一覧</h2>
+@if (IsLoading)
+{
+    <p>読み込み中...</p>
+}
+else if (ReservationList.Count == 0)
+{
+    <p>予約はまだありません。</p>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>施設</th>
+                <th>予約者</th>
+                <th>開始</th>
+                <th>終了</th>
+                <th>人数</th>
+                <th>目的</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var r in ReservationList)
+            {
+                <tr>
+                    <td>@r.Location</td>
+                    <td>@r.ReserverName</td>
+                    <td>@r.StartDateTime.ToString("yyyy/MM/dd HH:mm")</td>
+                    <td>@r.EndDateTime.ToString("yyyy/MM/dd HH:mm")</td>
+                    <td>@r.NumberOfPeople</td>
+                    <td>@r.Purpose</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteReservationAsync(r)">削除</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    // TODO: 施設の一覧は今後、必要に応じて追加・編集できるようにする
+    private readonly List<string> Facilities = new() { "会議室A", "会議室B", "多目的ホール" };
+
+    private List<ReservationDto> ReservationList { get; set; } = new();
+    private ReservationDto NewReservation { get; set; } = CreateEmptyReservation();
+    private string FilterLocation { get; set; } = string.Empty;
+    private bool IsLoading { get; set; }
+    private bool IsSubmitting { get; set; }
+    private string? ErrorMessage { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        NewReservation.Location = Facilities.FirstOrDefault() ?? string.Empty;
+        await LoadReservationsAsync();
+    }
+
+    private static ReservationDto CreateEmptyReservation()
+    {
+        var now = DateTime.Now;
+        var start = now.AddHours(1).Date.AddHours(now.AddHours(1).Hour);
+        return new ReservationDto
+        {
+            StartDateTime = start,
+            EndDateTime = start.AddHours(1),
+            NumberOfPeople = 1
+        };
+    }
+
+    private async Task LoadReservationsAsync()
+    {
+        IsLoading = true;
+        ErrorMessage = null;
+        try
+        {
+            var url = string.IsNullOrEmpty(FilterLocation)
+                ? "api/reservations"
+                : $"api/reservations?location={Uri.EscapeDataString(FilterLocation)}";
+            var result = await Http.GetFromJsonAsync<List<ReservationDto>>(url);
+            ReservationList = result ?? new List<ReservationDto>();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"予約一覧の取得に失敗しました: {ex.Message}";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task CreateReservationAsync()
+    {
+        IsSubmitting = true;
+        ErrorMessage = null;
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/reservations", NewReservation);
+            if (response.IsSuccessStatusCode)
+            {
+                NewReservation = CreateEmptyReservation();
+                NewReservation.Location = Facilities.FirstOrDefault() ?? string.Empty;
+                await LoadReservationsAsync();
+            }
+            else
+            {
+                var problem = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+                ErrorMessage = problem?.Error ?? $"予約の登録に失敗しました。(status: {response.StatusCode})";
+            }
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"予約の登録に失敗しました: {ex.Message}";
+        }
+        finally
+        {
+            IsSubmitting = false;
+        }
+    }
+
+    private async Task DeleteReservationAsync(ReservationDto reservation)
+    {
+        ErrorMessage = null;
+        try
+        {
+            var response = await Http.DeleteAsync($"api/reservations/{Uri.EscapeDataString(reservation.Location)}/{Uri.EscapeDataString(reservation.Id)}");
+            if (response.IsSuccessStatusCode)
+            {
+                await LoadReservationsAsync();
+            }
+            else
+            {
+                ErrorMessage = $"予約の削除に失敗しました。(status: {response.StatusCode})";
+            }
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"予約の削除に失敗しました: {ex.Message}";
+        }
+    }
+
+    private class ErrorResponse
+    {
+        public string? Error { get; set; }
+    }
+}

@@ -1,3 +1,4 @@
 <Solution>
+  <Project Path="RMS.Api/RMS.Api.csproj" />
   <Project Path="RMS.Web/RMS.Web.csproj" />
 </Solution>
