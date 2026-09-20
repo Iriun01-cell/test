@@ -1,0 +1,207 @@
+@page "/reservation-calendar"
+@using RMS.Web.Models
+@inject HttpClient Http
+
+<PageTitle>予約カレンダー</PageTitle>
+
+<h1>予約カレンダー</h1>
+
+<div class="d-flex align-items-center mb-3 flex-wrap gap-2">
+    <button class="btn btn-outline-secondary btn-sm" @onclick="GoToPreviousMonth">&lt; 前月</button>
+    <span class="fs-5 mx-2">@CurrentMonth.ToString("yyyy年 M月")</span>
+    <button class="btn btn-outline-secondary btn-sm" @onclick="GoToNextMonth">翌月 &gt;</button>
+    <button class="btn btn-outline-primary btn-sm ms-2" @onclick="GoToToday">今日</button>
+
+    <div class="ms-auto" style="min-width:220px;">
+        <select class="form-select form-select-sm" @bind="FilterLocation" @bind:after="LoadReservationsAsync">
+            <option value="">すべての施設</option>
+            @foreach (var loc in Facilities)
+            {
+                <option value="@loc">@loc</option>
+            }
+        </select>
+    </div>
+</div>
+
+@if (ErrorMessage is not null)
+{
+    <div class="alert alert-danger">@ErrorMessage</div>
+}
+
+@if (IsLoading)
+{
+    <p>読み込み中...</p>
+}
+else
+{
+    <table class="table table-bordered calendar-table">
+        <thead>
+            <tr>
+                @foreach (var dayName in DayNames)
+                {
+                    <th class="text-center">@dayName</th>
+                }
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var week in CalendarWeeks)
+            {
+                <tr>
+                    @foreach (var day in week)
+                    {
+                        <td class="calendar-cell @(day.Month != CurrentMonth.Month ? "calendar-cell-outside" : "") @(day == DateTime.Today ? "calendar-cell-today" : "")">
+                            <div class="calendar-date">@day.Day</div>
+                            @foreach (var r in GetReservationsForDay(day))
+                            {
+                                <div class="calendar-event" title="@($"{r.Location} / {r.ReserverName} / {r.Purpose}")">
+                                    <span class="calendar-event-time">@r.StartDateTime.ToString("HH:mm")</span>
+                                    <span class="calendar-event-location">@r.Location</span>
+                                    <span class="calendar-event-name">@r.ReserverName</span>
+                                </div>
+                            }
+                        </td>
+                    }
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+<style>
+    .calendar-table {
+        table-layout: fixed;
+    }
+
+    .calendar-cell {
+        vertical-align: top;
+        height: 110px;
+        width: 14.28%;
+        overflow: hidden;
+    }
+
+    .calendar-cell-outside {
+        background-color: #f8f9fa;
+        color: #adb5bd;
+    }
+
+    .calendar-cell-today {
+        background-color: #fff8e1;
+    }
+
+    .calendar-date {
+        font-weight: bold;
+        margin-bottom: 2px;
+    }
+
+    .calendar-event {
+        font-size: 0.75rem;
+        background-color: #e7f1ff;
+        border-left: 3px solid #0d6efd;
+        border-radius: 2px;
+        padding: 1px 4px;
+        margin-bottom: 2px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .calendar-event-time {
+        font-weight: bold;
+        margin-right: 4px;
+    }
+
+    .calendar-event-location {
+        margin-right: 4px;
+    }
+</style>
+
+@code {
+    // TODO: 施設予約(Reservations.razor)と一覧を共有しているが、将来的には共通化を検討
+    private readonly List<string> Facilities = new() { "会議室A", "会議室B", "多目的ホール" };
+    private static readonly string[] DayNames = { "日", "月", "火", "水", "木", "金", "土" };
+
+    private DateTime CurrentMonth { get; set; } = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+    private List<ReservationDto> ReservationList { get; set; } = new();
+    private string FilterLocation { get; set; } = string.Empty;
+    private bool IsLoading { get; set; }
+    private string? ErrorMessage { get; set; }
+
+    private List<List<DateTime>> CalendarWeeks
+    {
+        get
+        {
+            var firstOfMonth = CurrentMonth;
+            var firstDayOffset = (int)firstOfMonth.DayOfWeek; // 日曜=0始まり
+            var gridStart = firstOfMonth.AddDays(-firstDayOffset);
+
+            var weeks = new List<List<DateTime>>();
+            var current = gridStart;
+            while (true)
+            {
+                var week = new List<DateTime>();
+                for (var i = 0; i < 7; i++)
+                {
+                    week.Add(current);
+                    current = current.AddDays(1);
+                }
+                weeks.Add(week);
+
+                // 当月の最終日を含む週まで表示したら終了
+                if (week[^1] >= firstOfMonth.AddMonths(1).AddDays(-1))
+                {
+                    break;
+                }
+            }
+            return weeks;
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadReservationsAsync();
+    }
+
+    private IEnumerable<ReservationDto> GetReservationsForDay(DateTime day)
+    {
+        return ReservationList
+            .Where(r => r.StartDateTime.Date <= day.Date && r.EndDateTime.Date >= day.Date)
+            .OrderBy(r => r.StartDateTime);
+    }
+
+    private void GoToPreviousMonth()
+    {
+        CurrentMonth = CurrentMonth.AddMonths(-1);
+    }
+
+    private void GoToNextMonth()
+    {
+        CurrentMonth = CurrentMonth.AddMonths(1);
+    }
+
+    private void GoToToday()
+    {
+        CurrentMonth = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+    }
+
+    private async Task LoadReservationsAsync()
+    {
+        IsLoading = true;
+        ErrorMessage = null;
+        try
+        {
+            var url = string.IsNullOrEmpty(FilterLocation)
+                ? "api/reservations"
+                : $"api/reservations?location={Uri.EscapeDataString(FilterLocation)}";
+            var result = await Http.GetFromJsonAsync<List<ReservationDto>>(url);
+            ReservationList = result ?? new List<ReservationDto>();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"予約一覧の取得に失敗しました: {ex.Message}";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+}
