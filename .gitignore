@@ -1,0 +1,27 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+
+# Azure Functions ローカル設定(接続文字列などの秘密情報を含むためコミットしない)
+local.settings.json
+
+# 環境変数ファイル(.env.example のみコミットする)
+.env
+.env.*
+!.env.example
+
+# Node
+node_modules/
+dist/
+dist-ssr/
+*.log
+
+# エディタ・OS
+.idea/
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
+Thumbs.db
