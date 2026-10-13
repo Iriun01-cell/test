@@ -1,4 +1,8 @@
-import { PublicClientApplication, type Configuration } from "@azure/msal-browser";
+import {
+  LogLevel,
+  PublicClientApplication,
+  type Configuration,
+} from "@azure/msal-browser";
 
 // Microsoft Entra External ID(外部テナント)の設定。値は .env.local で指定する(.env.example 参照)
 const clientId = import.meta.env.VITE_ENTRA_CLIENT_ID as string | undefined;
@@ -20,6 +24,17 @@ const msalConfig: Configuration = {
     redirectUri: window.location.origin,
   },
   cache: { cacheLocation: "sessionStorage" },
+  system: {
+    // 開発時のみ、MSALの詳細ログをコンソールへ出力(原因調査用。個人情報を含むログは出さない)
+    loggerOptions: {
+      logLevel: import.meta.env.DEV ? LogLevel.Verbose : LogLevel.Warning,
+      piiLoggingEnabled: false,
+      loggerCallback: (_level, message, containsPii) => {
+        if (containsPii) return;
+        console.log(`[msal] ${message}`);
+      },
+    },
+  },
 };
 
 export const msalInstance = new PublicClientApplication(msalConfig);
