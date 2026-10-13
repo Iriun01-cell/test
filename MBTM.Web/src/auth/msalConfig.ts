@@ -25,13 +25,14 @@ const msalConfig: Configuration = {
   },
   cache: { cacheLocation: "sessionStorage" },
   system: {
-    // 開発時のみ、MSALの詳細ログをコンソールへ出力(原因調査用。個人情報を含むログは出さない)
+    // MSALのログは警告以上のみ出力(個人情報を含むログは出さない)
     loggerOptions: {
-      logLevel: import.meta.env.DEV ? LogLevel.Verbose : LogLevel.Warning,
+      logLevel: LogLevel.Warning,
       piiLoggingEnabled: false,
-      loggerCallback: (_level, message, containsPii) => {
+      loggerCallback: (level, message, containsPii) => {
         if (containsPii) return;
-        console.log(`[msal] ${message}`);
+        if (level === LogLevel.Error) console.error(`[msal] ${message}`);
+        else if (level === LogLevel.Warning) console.warn(`[msal] ${message}`);
       },
     },
   },
