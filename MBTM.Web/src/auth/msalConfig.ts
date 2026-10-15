@@ -43,3 +43,6 @@ export const msalInstance = new PublicClientApplication(msalConfig);
 export const loginRequest = {
   scopes: ["openid", "profile", ...(apiScope ? [apiScope] : [])],
 };
+
+// API呼び出し用のアクセストークン要求(VITE_ENTRA_API_SCOPE が未設定の場合は null)
+export const apiTokenRequest = apiScope ? { scopes: [apiScope] } : null;

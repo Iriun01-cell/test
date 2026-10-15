@@ -4,7 +4,8 @@ import {
   UnauthenticatedTemplate,
   useMsal,
 } from "@azure/msal-react";
-import { isAuthConfigured, loginRequest } from "./auth/msalConfig";
+import { apiTokenRequest, isAuthConfigured, loginRequest } from "./auth/msalConfig";
+import { TaskList } from "./components/TaskList";
 import { appInsights } from "./telemetry/appInsights";
 
 function toMessage(e: unknown): string {
@@ -60,6 +61,7 @@ function App() {
       <AuthenticatedTemplate>
         <p>{accounts[0]?.name ?? accounts[0]?.username} さん、ようこそ。</p>
         <button onClick={handleLogout}>ログアウト</button>
+        {apiTokenRequest && <TaskList />}
       </AuthenticatedTemplate>
       {error && (
         <pre style={{ color: "crimson", whiteSpace: "pre-wrap", textAlign: "left" }}>
