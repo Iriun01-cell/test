@@ -12,6 +12,9 @@ export const appInsights = connectionString
         connectionString,
         extensions: [reactPlugin],
         enableAutoRouteTracking: true,
+        // ブラウザの Permissions Policy で unload イベントが禁止されているため、unload は使わず
+        // beforeunload / pagehide でテレメトリを送信する(コンソールの Violation 警告を防ぐ)
+        disablePageUnloadEvents: ["unload"],
       },
     })
   : null;
